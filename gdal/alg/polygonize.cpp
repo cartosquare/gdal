@@ -261,12 +261,12 @@ void RPolygon::Merge( StringId iBaseString, StringId iSrcString, int iDirection 
     }
     else
     {
-        iStart = static_cast<int>(anString.size()) - 2;
+        iStart = static_cast<int>(anString.size()) - 1;
     }
 
     removeExtremity(oMapEndStrings, anBase.back(), iBaseString);
 
-    anBase.reserve(anBase.size() + anString.size() - 1);
+    anBase.reserve(anBase.size() + anString.size());
     for( int i = iStart; i != iEnd; i += iDirection )
     {
         anBase.push_back( anString[i] );
