@@ -238,12 +238,28 @@ void GDALRasterPolygonEnumeratorT<DataType, EqualityTest>::ProcessLine(
 /* -------------------------------------------------------------------- */
     for( int i = 0; i < nXSize; i++ )
     {
+        // check whether this pixel could cause self intersection
+        // if so, we want to isolate it by a new polygon
+        bool selfIntersectionDetected = false;
+        if ( i > 0
+             && !(eq.operator()(panThisLineVal[i], panThisLineVal[i-1]))
+             && !(eq.operator()(panThisLineVal[i], panLastLineVal[i]))
+             && eq.operator()(panThisLineVal[i], panLastLineVal[i-1]) ) {
+                 selfIntersectionDetected = true;
+        }
+        if ( i < nXSize-1
+             && !(eq.operator()(panThisLineVal[i], panThisLineVal[i+1]))
+             && !(eq.operator()(panThisLineVal[i], panLastLineVal[i]))
+             && eq.operator()(panThisLineVal[i], panLastLineVal[i+1]) ) {
+                 selfIntersectionDetected = true;
+        } 
+
         if( panThisLineVal[i] == GP_NODATA_MARKER )
         {
             panThisLineId[i] = -1;
         }
-        else if( i > 0 &&
-                 eq.operator()(panThisLineVal[i], panThisLineVal[i-1]) )
+        else if( i > 0 && !selfIntersectionDetected
+                 && eq.operator()(panThisLineVal[i], panThisLineVal[i-1]) )
         {
             panThisLineId[i] = panThisLineId[i-1];
 
@@ -270,11 +286,12 @@ void GDALRasterPolygonEnumeratorT<DataType, EqualityTest>::ProcessLine(
                 MergePolygon( panLastLineId[i+1], panThisLineId[i] );
             }
         }
-        else if( eq.operator()(panLastLineVal[i], panThisLineVal[i]) )
+        else if( !selfIntersectionDetected 
+                 && eq.operator()(panLastLineVal[i], panThisLineVal[i]) )
         {
             panThisLineId[i] = panLastLineId[i];
         }
-        else if( i > 0 && nConnectedness == 8
+        else if( i > 0 && nConnectedness == 8 && !selfIntersectionDetected
                  && eq.operator()(panLastLineVal[i-1], panThisLineVal[i]) )
         {
             panThisLineId[i] = panLastLineId[i-1];
@@ -287,7 +304,7 @@ void GDALRasterPolygonEnumeratorT<DataType, EqualityTest>::ProcessLine(
                 MergePolygon( panLastLineId[i+1], panThisLineId[i] );
             }
         }
-        else if( i < nXSize-1 && nConnectedness == 8
+        else if( i < nXSize-1 && nConnectedness == 8 && !selfIntersectionDetected
                  && eq.operator()(panLastLineVal[i+1], panThisLineVal[i]) )
         {
             panThisLineId[i] = panLastLineId[i+1];
@@ -295,6 +312,11 @@ void GDALRasterPolygonEnumeratorT<DataType, EqualityTest>::ProcessLine(
         else
         {
             panThisLineId[i] = NewPolygon(panThisLineVal[i]);
+        }
+
+        if (selfIntersectionDetected) {
+            // avoid merging with other polygons
+            panThisLineVal[i] = GP_NODATA_MARKER;
         }
     }
 }

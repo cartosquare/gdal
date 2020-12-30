@@ -261,12 +261,12 @@ void RPolygon::Merge( StringId iBaseString, StringId iSrcString, int iDirection 
     }
     else
     {
-        iStart = static_cast<int>(anString.size()) - 1;
+        iStart = static_cast<int>(anString.size()) - 2;
     }
 
     removeExtremity(oMapEndStrings, anBase.back(), iBaseString);
 
-    anBase.reserve(anBase.size() + anString.size());
+    anBase.reserve(anBase.size() + anString.size() - 1);
     for( int i = iStart; i != iEnd; i += iDirection )
     {
         anBase.push_back( anString[i] );
@@ -457,7 +457,7 @@ EmitPolygonToLayer( OGRLayerH hOutLayer, int iPixValField,
 
             OGR_G_SetPoint_2D( hRing, iVert, dfX, dfY );
         }
-
+        
         OGR_G_AddGeometryDirectly( hPolygon, hRing );
     }
 
