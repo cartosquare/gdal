@@ -181,15 +181,106 @@ def test_polygonize_4():
 
     # Confirm we get the set of expected features in the output layer.
 
-    expected_feature_number = 16
+    expected_feature_number = 17
     assert mem_layer.GetFeatureCount() == expected_feature_number
 
-    expect = [107, 123, 132, 115, 132, 115, 140, 148,
+    expect = [107, 123, 132, 115, 132, 115, 140, 132, 148,
               123, 140, 132, 156, 100, 101, 102, 103]
 
     tr = ogrtest.check_features_against_list(mem_layer, 'DN', expect)
 
     assert tr
 
+###############################################################################
+# Test a simple case with holes.
 
 
+def test_polygonize_5():
+
+    src_ds = gdal.Open('data/polygonize_in_3.grd')
+    src_band = src_ds.GetRasterBand(1)
+
+    # Create a memory OGR datasource to put results in.
+    mem_drv = ogr.GetDriverByName('Memory')
+    mem_ds = mem_drv.CreateDataSource('out')
+
+    mem_layer = mem_ds.CreateLayer('poly', None, ogr.wkbPolygon)
+
+    fd = ogr.FieldDefn('DN', ogr.OFTInteger)
+    mem_layer.CreateField(fd)
+
+    # run the algorithm.
+    result = gdal.Polygonize(src_band, None, mem_layer, 0)
+    assert result == 0, 'Polygonize failed'
+
+    # Confirm we get the set of expected features in the output layer.
+
+    expected_feature_number = 4
+    assert mem_layer.GetFeatureCount() == expected_feature_number
+
+    expect = [1, 0, 1, 0]
+    expect_wkt = [
+        'POLYGON ((0 4,0 0,4 0,4 4,0 4),(1 3,1 1,3 1,3 2,2 2,2 3,1 3))',
+        'POLYGON ((1 3,1 2,2 2,2 3,1 3))',
+        'POLYGON ((1 2,1 1,2 1,2 2,1 2))',
+        'POLYGON ((2 2,2 1,3 1,3 2,2 2))'
+    ]
+
+    idx = 0
+    for feature in mem_layer:
+        id = feature.GetField("DN")
+        assert id == expect[idx]
+
+        geom_poly = feature.GetGeometryRef()
+        wkt = geom_poly.ExportToWkt()
+        assert wkt == expect_wkt[idx]
+
+        idx += 1
+
+###############################################################################
+# Test a complex case to make sure the polygonized area match original raster.
+
+from collections import defaultdict
+
+def test_polygonize_6():
+
+    src_ds = gdal.Open('data/polygonize_check_area.tif')
+    src_band = src_ds.GetRasterBand(1)
+
+    # Create a memory OGR datasource to put results in.
+    mem_drv = ogr.GetDriverByName('Memory')
+    mem_ds = mem_drv.CreateDataSource('out')
+
+    mem_layer = mem_ds.CreateLayer('poly', None, ogr.wkbPolygon)
+
+    fd = ogr.FieldDefn('DN', ogr.OFTInteger)
+    mem_layer.CreateField(fd)
+
+    # run the algorithm.
+    result = gdal.Polygonize(src_band, src_band.GetMaskBand(), mem_layer, 0)
+    assert result == 0, 'Polygonize failed'
+
+    # collect raster image areas by DN value
+    transform = src_ds.GetGeoTransform()
+    pixel_area = abs(transform[1] * transform[5])
+
+    data = src_band.ReadAsArray(0, 0, src_ds.RasterXSize, src_ds.RasterYSize)
+    dn_area_raster = defaultdict(int)
+
+    for row in range(src_ds.RasterYSize):
+        for col in range(src_ds.RasterXSize):
+            if data[row, col] !=  src_band.GetNoDataValue():
+                dn_area_raster[data[row, col]] += pixel_area
+
+    # collect vector image areas by DN value
+    dn_area_vector = defaultdict(float)
+
+    for feature in mem_layer:
+        id = feature.GetField("DN")
+        geom = feature.GetGeometryRef()
+        dn_area_vector[id] += geom.GetArea()
+
+    assert len(dn_area_raster) == len(dn_area_vector), 'DN value inconsistent'
+
+    for key, value in dn_area_raster.items():
+        assert abs(value - dn_area_vector[key]) < 0.001, 'polygonized vector area not match raster area'
