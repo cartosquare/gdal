@@ -242,8 +242,8 @@ void GDALRasterPolygonEnumeratorT<DataType, EqualityTest>::ProcessLine(
         {
             panThisLineId[i] = -1;
         }
-        else if( i > 0 &&
-                 eq.operator()(panThisLineVal[i], panThisLineVal[i-1]) )
+        else if( i > 0
+                 && eq.operator()(panThisLineVal[i], panThisLineVal[i-1]) )
         {
             panThisLineId[i] = panThisLineId[i-1];
 

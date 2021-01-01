@@ -329,6 +329,13 @@ void RPolygon::AddSegment( int x1, int y1, int x2, int y2 )
             anString.push_back( xy1 );
         }
         insertExtremity(oMapEndStrings, anString.back(), iExistingString);
+
+        // merge rings if possible
+        StringId iExistingString2 = findExtremityNot(oMapEndStrings, xy1, iExistingString);
+        if( iExistingString2 >= 0 ) 
+        {
+            this->Merge(iExistingString, iExistingString2, -1);
+        }
         return;
     }
 
